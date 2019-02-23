@@ -14,7 +14,6 @@ resultdict = {}
 longBois = []
 logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
 sraAccess = "SRR8185310"
-#TODO check that directory "depen" exists and has X Y and Z in it for PROKKA esp
 #Downloads the files form sra database 
 if(not os.path.isfile(str(sraAccess+".sra"))):
     print("Getting Files")
@@ -66,14 +65,20 @@ if(assemb == 0):
 if(not os.path.isfile("longBoiContigs.fa")):
     result = ""
     for item in longBois:
-        result = result+ ">" +item[0]+ '\n'
+        result = result+ ">" +item[0].strip()+ '\n'
         result = result + item[1].strip() + '\n'
     #Boilerplate to write to file
-    file = open("longBoiContigs.fa", "w")
+    file = open("longBoi.fasta", "w")
     file.write(str(result))
     file.close()
-if(not os.path.exists(os.getcwd()+"/dep")):
-    os.system("mkdir dep")
-    os.chdir("dep")
-    os.system("echo hi")
+if(not os.path.exists(os.getcwd()+"/prokka")):
+    os.system("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
+    logging.info("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
+    os.chdir(cwd+"/prokka")
+    os.system("cp PROKKA*.txt "+cwd+"/prokka.txt")
+    os.chdir(cwd)
+    with open("prokka.txt", "r") as prokka:
+        allLine = prokka.readlines()
+    for line in allLine:
+        logging.info(line.strip())
 print("ok")
