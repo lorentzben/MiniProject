@@ -1,3 +1,4 @@
+#!/usr/bin/python3 
 #Automate Ecoli
 #Ben Lorentz 2.22.19
 import sys
@@ -62,6 +63,7 @@ if(assemb == 0):
     for each in longBois:
         assemb = len(each[1]) + assemb
     logging.info("There are " +str(assemb)+ " bp in the assembly")
+#Pulls in the contigs over 1000 bp
 if(not os.path.isfile("longBoiContigs.fa")):
     result = ""
     for item in longBois:
@@ -71,6 +73,7 @@ if(not os.path.isfile("longBoiContigs.fa")):
     file = open("longBoi.fasta", "w")
     file.write(str(result))
     file.close()
+#Runs prokka on the contigs longer than 1000 bp 
 if(not os.path.exists(os.getcwd()+"/prokka")):
     os.system("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
     logging.info("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
@@ -81,4 +84,72 @@ if(not os.path.exists(os.getcwd()+"/prokka")):
         allLine = prokka.readlines()
     for line in allLine:
         logging.info(line.strip())
-print("ok")
+ecoli = {}
+#Calculating diffs from the reference sequence and writes to log
+if(ecoli == {}):
+    ecoli = {"CDS":4140, "tRNAs":89}
+    with open("prokka.txt", "r") as prokka:
+       allLine = prokka.readlines()
+    data = {"CDS":int(allLine[3].split(":")[1].strip()), "tRNAs": int(allLine[4].split(":")[1].strip())}
+    cdsDiff=ecoli["CDS"]-data["CDS"]
+    tRNADiff=ecoli["tRNAs"]-data["tRNAs"]
+    logging.info("Prokka found " +str(abs(cdsDiff))+ (" additional" if cdsDiff > 0 else " fewer") + " CDS and " +str(abs(tRNADiff))+ (" additional " if  tRNADiff > 0 else " fewer ") + "tRNA than the RefSeq.")  
+#Pulls down sequence of ecoli k-12 and makes index and calls tophat on the reference
+if(not os.path.isfile("SRR1411276.sra")):
+    os.system("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR141/SRR1411276/SRR1411276.sra")
+    os.system("wget ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_refseq/Bacteria/Escherichia_coli_K_12_substr__MG1655_uid57779/NC_000913.fna")
+    print("Turning .sra to .fastq")
+    logging.info("Turning .sra file into .fastq file")
+    os.system("fastq-dump -I --split-files SRR1411276.sra")
+    logging.info("fastq-dump -I --split-files SRR1411276.sra")
+    os.system("bowtie2-build NC_000913.fna EcoliK12")
+    logging.info("bowtie2-build NC_000913.fna EcoliK12")
+    os.system("tophat2 --no-novel-juncs -o tophat EcoliK12 SRR1411276_1.fastq")
+    logging.info("tophat2 --no-novel-juncs -o tophat EcoliK12 SRR1411276_1.fastq")
+os.chdir("tophat")
+#runs cufflinks on the output from tophat
+if( not os.path.exists("cufflinks")):
+    logging.info("running cufflinks")
+    logging.info("cufflinks accepted_hits.bam -o cufflinks")
+    os.system("cufflinks accepted_hits.bam -o cufflinks")
+    os.chdir("cufflinks")
+    os.system("cp transcripts.gtf" + cwd)
+    os.chdir(cwd)
+#moves the cufflinks output to the top folder
+if( not os.path.isfile("transcripts.gtf")):
+    logging.info("Moving the transcripts.gtf file to: " + cwd)
+    os.chdir(cwd)
+    os.chdir("tophat")
+    os.chdir("cufflinks")
+    os.system("cp transcripts.gtf " +  cwd)
+    os.chdir(cwd)
+#creates the Option1.fpkm file formatted correctly
+if( not os.path.isfile("Option1.fpkm")):
+    logging.info("Formatting the final output")
+    output = ""
+    with open("transcripts.gtf", "r") as transcript:
+        record = []
+        for line in transcript:
+            record.append(line)
+        for i in range(0,len(record)):
+            if(i % 2 == 0):
+                seqname = record[i].split('\t')[0].strip()
+                start = record[i].split('\t')[3].strip()
+                end = record[i].split('\t')[4].strip()
+                strand = record[i].split('\t')[6].strip()
+                FPKM = record[i].split('\t')[8].split(";")[2]
+            else:
+                seqname = record[i].split('\t')[0].strip()
+                start = record[i].split('\t')[3].strip()
+                end = record[i].split('\t')[4].strip()
+                strand = record[i].split('\t')[6].strip()
+                FPKM = record[i].split('\t')[8].split(";")[3]
+            output = output + seqname+ ',' +start+ "," +end+ ',' +strand+ "," +FPKM + '\n'
+    
+    #Boilerplate to write to file
+    file = open("Option1.fpkm", "w")
+    file.write(str(output))
+    file.close()
+
+
+print("The final file is called Option1.fpkm in the directory : " + cwd)
