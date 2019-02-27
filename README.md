@@ -1,2 +1,4 @@
 # MiniProject
-Comp Bio 383 Mini Project Python Wrapper
+#### Ben Lorentz
+Comp Bio 383 Mini Project Python Wrapper Option 1
+
