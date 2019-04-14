@@ -19,6 +19,22 @@ def normal_verbose(cmd):
     call = subprocess.run([cmd], check=True, shell=True)
     logging.info(cmd)
 
+def check_program(tool):
+    try:
+        subprocess.call([tool, "--help"],stdout=subprocess.PIPE)
+    except OSError as e:
+        if e.errno == os.errno.ENOENT:
+            print(tool + " not found, installing")
+            logging.info(tool + " not found")
+            normal("sudo apt install -y " + tool)
+            logging.info("sudo apt install -y " + tool)
+    logging.info(tool +" installed and working fine")
+        
+def dependencies():
+    depends = ["python3","spades","bowtie","tophat","cufflinks"]
+    for tool in depends:
+        check_program(tool)
+
 #checks to see if working dir exists then moves in, or creates it based on necessity
 def create_working_directory():
     if(not os.path.exists("OptionA_Ben_Lorentz")):
@@ -189,6 +205,8 @@ def main():
     long_bois = []
     logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
     sraAccess = "SRR8185310"
+
+    dependencies()
 
     if(not os.path.isfile(str(sraAccess+".sra"))):
        collect_sra_files()
