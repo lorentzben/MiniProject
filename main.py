@@ -24,19 +24,23 @@ def check_program(tool):
         subprocess.call([tool, "--help"],stdout=subprocess.PIPE)
     except OSError as e:
         if e.errno == os.errno.ENOENT:
-            print(tool + " not found, installing")
-            logging.info(tool + " not found")
-            normal("sudo apt install -y " + tool)
-            logging.info("sudo apt install -y " + tool)
+            if tool == "fastq-dump":
+                normal("sudo apt install -y sra-toolkit")
+                logging.info("sudo apt install -y sra-toolkit")
+            else:
+                print(tool + " not found, installing")
+                logging.info(tool + " not found")
+                normal("sudo apt install -y " + tool)
+                logging.info("sudo apt install -y " + tool)
     logging.info(tool +" installed and working fine")
         
 def dependencies():
-    depends = ["python3","spades","bowtie","tophat","cufflinks"]
+    depends = ["python3","spades","bowtie","tophat","cufflinks","fastq-dump"]
     for tool in depends:
         check_program(tool)
 
 #checks to see if working dir exists then moves in, or creates it based on necessity
-def create_working_directory():
+def create_working_directory(dir):
     if(not os.path.exists("OptionA_Ben_Lorentz")):
         os.system("mkdir OptionA_Ben_Lorentz")
         os.chdir(dir+"/OptionA_Ben_Lorentz")
@@ -47,7 +51,7 @@ def create_working_directory():
 def collect_sra_files():
     print("Getting Files")
     logging.info("The reads were not found so we are downloading them now")
-    normal("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR818/SRR8185310/SRR8185310.sra")
+    normal("fastq-dump -A SRR8185310 -O .")
 
 #Converts .sra files into .fastq files
 def sra_to_fastq():
@@ -56,13 +60,13 @@ def sra_to_fastq():
     normal("fastq-dump -I --split-files "+sraAccess+".sra")
 
 #Assembles the reads using typical params with spades
-def spades():
+def spades(sraAccess):
     print("Running spades with standard params")
-    logging.info("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades")
-    normal("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades") 
+    logging.info("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+".fastq -o "+os.getcwd()+"/spades")
+    normal("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+".fastq -o "+os.getcwd()+"/spades") 
 
 #Goes into  spades folder and pull contigs.fasta out
-def pull_out_contigs():
+def pull_out_contigs(cwd):
     os.chdir(cwd+"/spades")
     normal("cp contigs.fasta "+cwd+"/")
     os.chdir(cwd)
@@ -94,11 +98,10 @@ def count_contigs(long_bois):
 
 
 #Calculate the length of the assembly 
-def assembly_len():
-assemb = 0
-if(assemb == 0):
+def assembly_len(assemb, long_bois):
     for each in long_bois:
         assemb = len(each[1]) + assemb
+    return assemb
     logging.info("There are " +str(assemb)+ " bp in the assembly") 
 
 #Pulls in the contigs over 1000 bp
@@ -137,7 +140,7 @@ def reference_diffs(ecoli):
 
 #Pulls down sequence of ecoli k-12 and makes index and calls tophat on the reference
 def ecoli_tophat():
-    normal("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR141/SRR1411276/SRR1411276.sra")
+    normal("fastq-dump -A SRR1411276 -O .")
     normal("wget ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_refseq/Bacteria/Escherichia_coli_K_12_substr__MG1655_uid57779/NC_000913.fna")
     print("Turning .sra to .fastq")
     logging.info("Turning .sra file into .fastq file")
@@ -198,9 +201,9 @@ def write_fpkm_file():
 
 def main():
     dir = os.getcwd()
-    cwd = dir+"/OptionA_Ben_Lorentz"
+    cwd = str(dir)+"/OptionA_Ben_Lorentz"
 
-    create_working_directory()
+    create_working_directory(dir)
 
     long_bois = []
     logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
@@ -210,14 +213,15 @@ def main():
 
     if(not os.path.isfile(str(sraAccess+".sra"))):
        collect_sra_files()
-    if(not os.path.isfile(str(sraAccess+"_1.fastq"))):
-        sra_to_fastq() 
     if(not os.path.exists(os.getcwd()+"/spades")):
-        spades()
+        spades(sraAccess)
     if (not os.path.isfile("contigs.fasta")):
-        pull_out_contigs()
+        pull_out_contigs(cwd)
     if(long_bois == {}):
         long_bois  = count_contigs(long_bois)
+    assemb = 0 
+    if(assemb == 0):
+        assemb = assembly_len(assemb, long_bois)
     if(not os.path.isfile("longBoiContigs.fa")):
         write_fasta_to_file(long_bois)
     if(not os.path.exists(os.getcwd()+"/prokka")):
@@ -237,6 +241,6 @@ def main():
         write_fpkm_out()
     print("The final file is called Option1.fpkm in the directory : " + cwd)
 
-if __init__ == "__main__"":
+if __name__ == "__main__":
     main()
 
