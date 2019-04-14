@@ -1,36 +1,50 @@
 #!/usr/bin/python3 
-#Automate Ecoli
-#Ben Lorentz 2.22.19
+"""Main.py: This is a script that automates the collection, assembly, and annotation of the E. coli K-12 sequences."""
+
+__author__ = "Ben Lorentz"
+__email__ = "blorentz@luc.edu"
+
+import subprocess
 import sys
 import os
 import logging
-dir = os.getcwd()
-cwd = dir+"/OptionA_Ben_Lorentz"
-if(not os.path.exists("OptionA_Ben_Lorentz")):
-    os.system("mkdir OptionA_Ben_Lorentz")
-    os.chdir(dir+"/OptionA_Ben_Lorentz")
-else:
-    os.chdir(dir+"/OptionA_Ben_Lorentz")
-resultdict = {}
-longBois = []
-logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
-sraAccess = "SRR8185310"
-#Downloads the files form sra database 
-if(not os.path.isfile(str(sraAccess+".sra"))):
+
+
+#runs bash command but does not print out
+def normal(cmd):
+    subprocess.run([cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, shell=True)
+    logging.info(cmd)
+#runs call and prints out to shell session
+def normal_verbose(cmd):
+    call = subprocess.run([cmd], check=True, shell=True)
+    logging.info(cmd)
+
+#checks to see if working dir exists then moves in, or creates it based on necessity
+def create_working_directory():
+    if(not os.path.exists("OptionA_Ben_Lorentz")):
+        os.system("mkdir OptionA_Ben_Lorentz")
+        os.chdir(dir+"/OptionA_Ben_Lorentz")
+    else:
+        os.chdir(dir+"/OptionA_Ben_Lorentz")
+
+#will download the .sra files if not found in the directory
+def collect_sra_files():
     print("Getting Files")
     logging.info("The reads were not found so we are downloading them now")
-    os.system("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR818/SRR8185310/SRR8185310.sra")
-#Need to turn the .sra file into .fastq so we can use spades to assemble
-if(not os.path.isfile(str(sraAccess+"_1.fastq"))):
+    normal("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR818/SRR8185310/SRR8185310.sra")
+
+#Converts .sra files into .fastq files
+def sra_to_fastq():
     print("Turning .sra to .fastq")
     logging.info("Turning .sra file into .fastq file")
-    os.system("fastq-dump -I --split-files "+sraAccess+".sra")
+    normal("fastq-dump -I --split-files "+sraAccess+".sra")
 
-#Assemble reads using spades and typical params
-if(not os.path.exists(os.getcwd()+"/spades")):
-   print("Running spades with standard params")
-   logging.info("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades")
-   os.system("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades")
+#Assembles the reads using typical params with spades
+def spades():
+    print("Running spades with standard params")
+    logging.info("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades")
+    os.system("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades") 
+
 #Goes into  spades folder and pull contigs.fasta out
 if (not os.path.isfile("contigs.fasta")):
     os.chdir(cwd+"/spades")
@@ -152,4 +166,24 @@ if( not os.path.isfile("Option1.fpkm")):
     file.close()
 
 
+def main():
+    #TODO These need to go after all of the functions
+    dir = os.getcwd()
+    cwd = dir+"/OptionA_Ben_Lorentz"
+    create_working_directory()
+    #TODO These need to go after all of the functions
+    result_dict = {}
+    long_Bois = []
+    logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
+    sraAccess = "SRR8185310"
+    if(not os.path.isfile(str(sraAccess+".sra"))):
+       collect_sra_files()
+    if(not os.path.isfile(str(sraAccess+"_1.fastq"))):
+        sra_to_fastq() 
+    if(not os.path.exists(os.getcwd()+"/spades")):
+        spades()
+    
+
 print("The final file is called Option1.fpkm in the directory : " + cwd)
+if __init__ == "__main__"":
+    main()
