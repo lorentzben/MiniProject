@@ -43,102 +43,116 @@ def sra_to_fastq():
 def spades():
     print("Running spades with standard params")
     logging.info("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades")
-    os.system("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades") 
+    normal("spades -k 55,77,99,127 -t 2 --only-assembler -s "+sraAccess+"_1.fastq -o "+os.getcwd()+"/spades") 
 
 #Goes into  spades folder and pull contigs.fasta out
-if (not os.path.isfile("contigs.fasta")):
+def pull_out_contigs():
     os.chdir(cwd+"/spades")
-    os.system("cp contigs.fasta "+cwd+"/")
+    normal("cp contigs.fasta "+cwd+"/")
     os.chdir(cwd)
-if(resultdict == {}):
+
+#Calculates the number of contigs over 1000
+def count_contigs(long_bois):
     with open("contigs.fasta", "r") as myfile:
         allseq = myfile.readlines()
     #My way of parsing a fasta file into a dictionary keys are seqID and values are seqs
     seq = ""
     header = ""
+    result_dict = {}
     for item in allseq:
         if(item[0]==">"):
              header =  item[1:].strip()
              seq = " "
         if (item[0] != ">" and (item[0] == "A" or item[0] == "T" or item[0] == "C" or item[0] == "G")):
              seq = seq + item[0:].strip()
-        resultdict[header]=seq
+        result_dict[header]=seq
 
     #this turns a dict into a list
-    resultlist = list(resultdict.items())
-    logging.info(str(len(resultlist)) + " contigs after alignment")
+    result_list = list(result_dict.items())
+    logging.info(str(len(result_list)).join(" contigs after alignment"))
     for item in resultlist:
         if (len(item[1]) >= 1000):
-            longBois.append(item)
+            long_bois.append(item)
     logging.info("There are " + str(len(longBois)) + " contigs > 1000 in the assembly.")
+    return long_bois
+
+
 #Calculate the length of the assembly 
+def assembly_len():
 assemb = 0
 if(assemb == 0):
-    for each in longBois:
+    for each in long_bois:
         assemb = len(each[1]) + assemb
-    logging.info("There are " +str(assemb)+ " bp in the assembly")
+    logging.info("There are " +str(assemb)+ " bp in the assembly") 
+
 #Pulls in the contigs over 1000 bp
-if(not os.path.isfile("longBoiContigs.fa")):
+def write_fasta_to_file(long_bois):
     result = ""
-    for item in longBois:
+    for item in long_bois:
         result = result+ ">" +item[0].strip()+ '\n'
         result = result + item[1].strip() + '\n'
     #Boilerplate to write to file
     file = open("longBoi.fasta", "w")
     file.write(str(result))
     file.close()
+
 #Runs prokka on the contigs longer than 1000 bp 
-if(not os.path.exists(os.getcwd()+"/prokka")):
-    os.system("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
+def prokka():
+    normal("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
     logging.info("prokka --usegenus --outdir prokka -genus Escherichia longBoi.fasta")
     os.chdir(cwd+"/prokka")
-    os.system("cp PROKKA*.txt "+cwd+"/prokka.txt")
+    normal("cp PROKKA*.txt "+cwd+"/prokka.txt")
     os.chdir(cwd)
     with open("prokka.txt", "r") as prokka:
-        allLine = prokka.readlines()
-    for line in allLine:
+        all_line = prokka.readlines()
+    for line in all_line:
         logging.info(line.strip())
+
 ecoli = {}
 #Calculating diffs from the reference sequence and writes to log
-if(ecoli == {}):
+def reference_diffs(ecoli):
     ecoli = {"CDS":4140, "tRNAs":89}
     with open("prokka.txt", "r") as prokka:
-       allLine = prokka.readlines()
-    data = {"CDS":int(allLine[3].split(":")[1].strip()), "tRNAs": int(allLine[4].split(":")[1].strip())}
-    cdsDiff=ecoli["CDS"]-data["CDS"]
-    tRNADiff=ecoli["tRNAs"]-data["tRNAs"]
-    logging.info("Prokka found " +str(abs(cdsDiff))+ (" additional" if cdsDiff > 0 else " fewer") + " CDS and " +str(abs(tRNADiff))+ (" additional " if  tRNADiff > 0 else " fewer ") + "tRNA than the RefSeq.")  
+       all_line = prokka.readlines()
+    data = {"CDS":int(all_line[3].split(":")[1].strip()), "tRNAs": int(all_line[4].split(":")[1].strip())}
+    cds_diff=ecoli["CDS"]-data["CDS"]
+    tRNA_diff=ecoli["tRNAs"]-data["tRNAs"]
+    logging.info("Prokka found " +str(abs(cds_diff))+ (" additional" if cds_diff > 0 else " fewer") + " CDS and " +str(abs(tRNA_diff))+ (" additional " if  tRNA_diff > 0 else " fewer ") + "tRNA than the RefSeq.")  
+
 #Pulls down sequence of ecoli k-12 and makes index and calls tophat on the reference
-if(not os.path.isfile("SRR1411276.sra")):
-    os.system("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR141/SRR1411276/SRR1411276.sra")
-    os.system("wget ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_refseq/Bacteria/Escherichia_coli_K_12_substr__MG1655_uid57779/NC_000913.fna")
+def ecoli_tophat():
+    normal("wget ftp://ftp.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR141/SRR1411276/SRR1411276.sra")
+    normal("wget ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_refseq/Bacteria/Escherichia_coli_K_12_substr__MG1655_uid57779/NC_000913.fna")
     print("Turning .sra to .fastq")
     logging.info("Turning .sra file into .fastq file")
-    os.system("fastq-dump -I --split-files SRR1411276.sra")
+    normal("fastq-dump -I --split-files SRR1411276.sra")
     logging.info("fastq-dump -I --split-files SRR1411276.sra")
-    os.system("bowtie2-build NC_000913.fna EcoliK12")
+    normal("bowtie2-build NC_000913.fna EcoliK12")
     logging.info("bowtie2-build NC_000913.fna EcoliK12")
-    os.system("tophat2 --no-novel-juncs -o tophat EcoliK12 SRR1411276_1.fastq")
+    normal("tophat2 --no-novel-juncs -o tophat EcoliK12 SRR1411276_1.fastq")
     logging.info("tophat2 --no-novel-juncs -o tophat EcoliK12 SRR1411276_1.fastq")
-os.chdir("tophat")
+
+
 #runs cufflinks on the output from tophat
-if( not os.path.exists("cufflinks")):
+def cufflinks():
     logging.info("running cufflinks")
     logging.info("cufflinks accepted_hits.bam -o cufflinks")
-    os.system("cufflinks accepted_hits.bam -o cufflinks")
+    normal("cufflinks accepted_hits.bam -o cufflinks")
     os.chdir("cufflinks")
-    os.system("cp transcripts.gtf" + cwd)
+    normal("cp transcripts.gtf" + cwd)
     os.chdir(cwd)
+
 #moves the cufflinks output to the top folder
-if( not os.path.isfile("transcripts.gtf")):
+def copy_cufflinks_out():
     logging.info("Moving the transcripts.gtf file to: " + cwd)
     os.chdir(cwd)
     os.chdir("tophat")
     os.chdir("cufflinks")
-    os.system("cp transcripts.gtf " +  cwd)
+    normal("cp transcripts.gtf " +  cwd)
     os.chdir(cwd)
+
 #creates the Option1.fpkm file formatted correctly
-if( not os.path.isfile("Option1.fpkm")):
+def write_fpkm_file():
     logging.info("Formatting the final output")
     output = ""
     with open("transcripts.gtf", "r") as transcript:
@@ -167,23 +181,44 @@ if( not os.path.isfile("Option1.fpkm")):
 
 
 def main():
-    #TODO These need to go after all of the functions
     dir = os.getcwd()
     cwd = dir+"/OptionA_Ben_Lorentz"
+
     create_working_directory()
-    #TODO These need to go after all of the functions
-    result_dict = {}
-    long_Bois = []
+
+    long_bois = []
     logging.basicConfig(level=logging.DEBUG, filename="OptionA.log")
     sraAccess = "SRR8185310"
+
     if(not os.path.isfile(str(sraAccess+".sra"))):
        collect_sra_files()
     if(not os.path.isfile(str(sraAccess+"_1.fastq"))):
         sra_to_fastq() 
     if(not os.path.exists(os.getcwd()+"/spades")):
         spades()
-    
+    if (not os.path.isfile("contigs.fasta")):
+        pull_out_contigs()
+    if(long_bois == {}):
+        long_bois  = count_contigs(long_bois)
+    if(not os.path.isfile("longBoiContigs.fa")):
+        write_fasta_to_file(long_bois)
+    if(not os.path.exists(os.getcwd()+"/prokka")):
+        prokka() 
+    ecoli = {}
+    if(ecoli == {}):
+        reference_diffs(ecoli)
+    if(not os.path.isfile("SRR1411276.sra")):
+        ecoli_tophat()
+    os.chdir("tophat")
+    if(not os.path.exists("cufflinks")):
+        cufflinks()
+    os.chdir(cwd)
+    if(not os.path.isfile("transcripts.gtf")):
+        copy_cufflinks_out() 
+    if( not os.path.isfile("Option1.fpkm")):
+        write_fpkm_out()
+    print("The final file is called Option1.fpkm in the directory : " + cwd)
 
-print("The final file is called Option1.fpkm in the directory : " + cwd)
 if __init__ == "__main__"":
     main()
+
