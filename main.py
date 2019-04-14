@@ -74,12 +74,12 @@ def pull_out_contigs(cwd):
 #Calculates the number of contigs over 1000
 def count_contigs(long_bois):
     with open("contigs.fasta", "r") as myfile:
-        allseq = myfile.readlines()
+        all_seq = myfile.readlines()
     #My way of parsing a fasta file into a dictionary keys are seqID and values are seqs
     seq = ""
     header = ""
     result_dict = {}
-    for item in allseq:
+    for item in all_seq:
         if(item[0]==">"):
              header =  item[1:].strip()
              seq = " "
@@ -90,10 +90,11 @@ def count_contigs(long_bois):
     #this turns a dict into a list
     result_list = list(result_dict.items())
     logging.info(str(len(result_list)).join(" contigs after alignment"))
-    for item in resultlist:
+    for item in result_list:
         if (len(item[1]) >= 1000):
             long_bois.append(item)
     logging.info("There are " + str(len(longBois)) + " contigs > 1000 in the assembly.")
+    print(long_bois)
     return long_bois
 
 
@@ -106,6 +107,8 @@ def assembly_len(assemb, long_bois):
 
 #Pulls in the contigs over 1000 bp
 def write_fasta_to_file(long_bois):
+    print("Working on writing longBoi.fasta")
+    print(long_bois)
     result = ""
     for item in long_bois:
         result = result+ ">" +item[0].strip()+ '\n'
@@ -219,10 +222,12 @@ def main():
         pull_out_contigs(cwd)
     if(long_bois == {}):
         long_bois  = count_contigs(long_bois)
+        print(long_bois)
     assemb = 0 
     if(assemb == 0):
         assemb = assembly_len(assemb, long_bois)
     if(not os.path.isfile("longBoiContigs.fa")):
+        print(long_bois)
         write_fasta_to_file(long_bois)
     if(not os.path.exists(os.getcwd()+"/prokka")):
         prokka() 
